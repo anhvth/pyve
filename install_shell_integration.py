@@ -27,7 +27,7 @@ def install_shell_integration():
     shell_name, config_file = detect_shell_and_config()
     
     # Determine which shell integration script to use
-    script_dir = Path(__file__).parent / "vex"
+    script_dir = Path(__file__).parent / "pyve"
     if shell_name == 'zsh':
         integration_script = script_dir / "shell_integration_zsh.sh"
     else:

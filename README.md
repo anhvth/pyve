@@ -15,14 +15,14 @@ A comprehensive Python package for managing virtual environments, providing equi
 ### From Source
 
 ```bash
-cd /home/anhvth5/dotfiles/custom-tools/virtual_envs_manager
-pip install -e .
+
+pip install git+https://github.com/anhvth/uv-virtual-environs-manager
 ```
 
 ### From PyPI (once published)
 
 ```bash
-pip install vex
+pip install pyve
 ```
 
 ## Quick Start

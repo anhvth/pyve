@@ -56,7 +56,7 @@ _ve_auto_activate() {
 import os
 from pathlib import Path
 try:
-    from vex import VenvManager
+    from pyve import VenvManager
     manager = VenvManager()
     env = manager.get_auto_activate_env()
     if env:
