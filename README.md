@@ -150,7 +150,7 @@ pip install -e .
 python -m pytest
 
 # Type checking
-mypy vex/
+mypy pyve/
 ```
 
 ### Contributing

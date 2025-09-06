@@ -1,4 +1,4 @@
-name: Publish vex to PyPI
+name: Publish pyve to PyPI
 
 on:
   push:
