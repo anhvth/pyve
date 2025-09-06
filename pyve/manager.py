@@ -292,7 +292,7 @@ class VenvManager:
                 else:
                     self.console.print("uv installation failed")
                     return False
-        except Exception as e:
+        except Exception:
             self.console.print("uv installation failed")
             return False
 

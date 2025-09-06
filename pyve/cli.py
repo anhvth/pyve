@@ -89,7 +89,6 @@ def interactive_env_selection():
 
 def show_help_suggestions(console: Console, partial_cmd=""):
     """Show help with command suggestions."""
-    manager = VenvManager()
     
     if partial_cmd:
         suggestions = suggest_command(partial_cmd)
