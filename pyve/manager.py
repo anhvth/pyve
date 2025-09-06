@@ -337,6 +337,10 @@ class VenvManager:
                 activate_script = venv_path / "bin" / "activate"
                 self._update_global_tracking(env_name, str(activate_script))
                 self.console.print(f"✅ Created venv: {env_name}")
+                
+                # Install base requirements
+                self._install_base_requirements(venv_path)
+                
                 return True
 
         # Try python3
@@ -349,6 +353,10 @@ class VenvManager:
                 activate_script = venv_path / "bin" / "activate"
                 self._update_global_tracking(env_name, str(activate_script))
                 self.console.print(f"✅ Created venv: {env_name}")
+                
+                # Install base requirements
+                self._install_base_requirements(venv_path)
+                
                 return True
 
         # Try python
@@ -361,10 +369,49 @@ class VenvManager:
                 activate_script = venv_path / "bin" / "activate"
                 self._update_global_tracking(env_name, str(activate_script))
                 self.console.print(f"✅ Created venv: {env_name}")
+                
+                # Install base requirements
+                self._install_base_requirements(venv_path)
+                
                 return True
 
         self.console.print("Failed to create venv", style="red")
         return False
+
+    def _install_base_requirements(self, venv_path: Path) -> None:
+        """Install base requirements from base_reqs.txt into the new virtual environment."""
+        base_reqs_file = Path(__file__).parent.parent / "base_reqs.txt"
+        if not base_reqs_file.exists():
+            return
+        
+        try:
+            with open(base_reqs_file, 'r') as f:
+                packages = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+            
+            if not packages:
+                return
+            
+            # Try pip from the new venv first
+            pip_path = venv_path / "bin" / "pip"
+            if pip_path.exists():
+                cmd = [str(pip_path), "install"] + packages
+                returncode, stdout, stderr = self._run_command(cmd, capture_output=True)
+                if returncode == 0:
+                    self.console.print(f"✅ Installed base requirements: {' '.join(packages)}")
+                    return
+            
+            # Try uv pip as fallback
+            if self._find_executable("uv"):
+                cmd = ["uv", "pip", "install", "--python", str(venv_path / "bin" / "python")] + packages
+                returncode, stdout, stderr = self._run_command(cmd, capture_output=True)
+                if returncode == 0:
+                    self.console.print(f"✅ Installed base requirements: {' '.join(packages)}")
+                    return
+            
+            self.console.print("⚠️  Failed to install base requirements - no pip or uv found", style="yellow")
+                
+        except Exception as e:
+            self.console.print(f"⚠️  Error installing base requirements: {e}", style="yellow")
 
     def activate_venv(self, name: str, vscode: bool = False, auto: bool = False) -> bool:
         """Activate a virtual environment."""
@@ -480,7 +527,7 @@ class VenvManager:
             if Path(activate_path).exists():
                 marker = "*" if current_venv and Path(current_venv) == venv_path else " "
                 status = "[bold green]*[/bold green]" if marker == "*" else " "
-                table.add_row(status, env_name, f"ve activate {venv_path}")
+                table.add_row(status, env_name, f"ve activate {env_name}")
                 count += 1
                 valid_lines.append(line)
             else:
