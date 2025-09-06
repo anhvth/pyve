@@ -495,6 +495,7 @@ def main():
         env_name = None
         python_version = None
         packages = []
+        auto_yes = False
         
         i = 0
         while i < len(cleaned_args):
@@ -502,6 +503,9 @@ def main():
             if arg == '-n' and i + 1 < len(cleaned_args):
                 env_name = cleaned_args[i + 1]
                 i += 2
+            elif arg == '-y':
+                auto_yes = True
+                i += 1
             elif arg.startswith('--python='):
                 python_version = arg.split('=', 1)[1]
                 i += 1
@@ -533,28 +537,12 @@ def main():
         extra_args = []
         if python_version:
             extra_args.extend(['--python', python_version])
-        
-        console.print(f"🐍 Creating environment: {env_name}", style="blue")
-        if python_version:
-            console.print(f"   Python version: {python_version}", style="blue")
-        if packages:
-            console.print(f"   Installing packages: {', '.join(packages)}", style="blue")
+        if auto_yes:
+            extra_args.append('-y')
         
         success = manager.create_venv(env_name, extra_args)
-        if success:
-            console.print(f"✅ Environment '{env_name}' created successfully!", style="green")
-            
-            # Install additional packages if specified
-            if packages:
-                console.print(f"📦 Installing packages in {env_name}...", style="blue")
-                manager.install_packages(packages)
-                console.print("✅ Packages installed!", style="green")
-            
-            console.print("\n🚀 To activate:", style="green")
-            console.print(f"   ve activate {env_name}", style="bold cyan")
-            console.print("\n💡 Pro tip: Use 've activate' for directory-aware activation", style="cyan")
-        else:
-            console.print(f"❌ Failed to create environment '{env_name}'", style="red")
+        if success and packages:
+            manager.install_packages(packages)
     
     elif command == 'deactivate':
         manager.deactivate_venv()
@@ -578,7 +566,12 @@ def main():
                     return
             manager.list_venvs()
             return
-        manager.delete_venv(args[0])
+        
+        # Check for -y flag
+        env_name = args[0]
+        auto_yes = '-y' in args
+        
+        manager.delete_venv(env_name, auto_yes)
     
     elif command == 'info':
         manager.info_venv()

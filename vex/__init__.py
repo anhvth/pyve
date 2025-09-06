@@ -12,7 +12,7 @@ try:
 except ImportError:
     import subprocess
     import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "uv", "rich", "typer", "virtualenv"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "git+", "https://github.com/anhvth/uv-virtual-environs-manager"])
     from .manager import VenvManager
 
 __all__ = ["VenvManager"]

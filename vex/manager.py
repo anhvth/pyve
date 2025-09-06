@@ -264,9 +264,6 @@ class VenvManager:
         """Install uv package manager if not already installed."""
         if self._find_executable("uv"):
             self.console.print("uv is already installed")
-            returncode, stdout, stderr = self._run_command(["uv", "--version"], capture_output=True)
-            if returncode == 0:
-                self.console.print(stdout.strip())
             return True
 
         self.console.print("Installing uv...")
@@ -288,26 +285,24 @@ class VenvManager:
                     # Check if uv is now available
                     if self._find_executable("uv"):
                         self.console.print("uv installed successfully!")
-                        returncode, stdout, stderr = self._run_command(["uv", "--version"], capture_output=True)
-                        if returncode == 0:
-                            self.console.print(stdout.strip())
                         return True
                     else:
-                        self.console.print("uv installation completed, but command not found in PATH.")
-                        self.console.print("You may need to restart your shell or run: source ~/.zshrc")
-                        self.console.print("uv is typically installed to ~/.cargo/bin/uv")
+                        self.console.print("uv installation failed")
                         return False
                 else:
-                    self.console.print(f"uv installation failed: {stderr}")
+                    self.console.print("uv installation failed")
                     return False
         except Exception as e:
-            self.console.print(f"Error installing uv: {e}")
+            self.console.print("uv installation failed")
             return False
 
     def create_venv(self, env_name: str, extra_args: Optional[List[str]] = None) -> bool:
         """Create a new virtual environment."""
         if extra_args is None:
             extra_args = []
+            
+        auto_yes = "-y" in extra_args
+        extra_args = [arg for arg in extra_args if arg != "-y"]
             
         if not env_name:
             self.console.print("Usage: create <name> [--python=3.12]", style="red")
@@ -321,89 +316,54 @@ class VenvManager:
 
         # Check if venv already exists in ~/.venvs
         if venv_path.exists():
-            self.console.print(f"Virtual environment already exists: {venv_path}", style="yellow")
-            if not self._confirm_action(f"Overwrite {venv_path}?"):
-                self.console.print("Cancelled. Not overwriting.", style="yellow")
+            if not auto_yes and not self._confirm_action(f"Overwrite {venv_path}?"):
                 return False
             shutil.rmtree(venv_path)
 
         # Check if environment name already exists in global tracking
         existing_path = self._get_env_from_tracking(env_name)
         if existing_path:
-            existing_venv_dir = Path(existing_path).parent.parent
-            self.console.print(f"Environment name '{env_name}' already tracked at: {existing_venv_dir}", style="yellow")
-            if not self._confirm_action(f"Overwrite tracking for '{env_name}'?"):
-                self.console.print("Cancelled. Environment name already in use.", style="yellow")
+            if not auto_yes and not self._confirm_action(f"Overwrite tracking for '{env_name}'?"):
                 return False
             self._remove_from_global_tracking(env_name)
-
-        self.console.print(f"Creating venv: {env_name} at {venv_path} {' '.join(extra_args)}", style="blue")
 
         # Try uv first
         uv_path = self._find_executable("uv")
         if uv_path:
-            self.console.print("Found uv, attempting to create venv...", style="blue")
             cmd = [uv_path, "venv"] + extra_args + [str(venv_path)]
-            returncode, stdout, stderr = self._run_command(cmd)
+            returncode, stdout, stderr = self._run_command(cmd, capture_output=True)
             
             if returncode == 0:
-                self.console.print(f"Created with uv: {venv_path}", style="green")
                 activate_script = venv_path / "bin" / "activate"
                 self._update_global_tracking(env_name, str(activate_script))
-                self.console.print(f"Registered {env_name} in global tracking", style="blue")
-                self.activate_venv(env_name)
+                self.console.print(f"✅ Created venv: {env_name}")
                 return True
-            else:
-                self.console.print("uv failed, trying to install Python and retry...", style="yellow")
-                install_cmd = [uv_path, "python", "install"]
-                returncode, _, _ = self._run_command(install_cmd)
-                if returncode == 0:
-                    returncode, stdout, stderr = self._run_command(cmd)
-                    if returncode == 0:
-                        self.console.print(f"Created with uv (after Python install): {venv_path}", style="green")
-                        activate_script = venv_path / "bin" / "activate"
-                        self._update_global_tracking(env_name, str(activate_script))
-                        self.console.print(f"Registered {env_name} in global tracking", style="blue")
-                        self.activate_venv(env_name)
-                        return True
 
         # Try python3
         py3_path = self._find_executable("python3")
         if py3_path:
-            self.console.print("Found python3, attempting to create venv...", style="blue")
-            if extra_args:
-                self.console.print(f"Extra args ignored for python3: {' '.join(extra_args)}", style="yellow")
-            
             cmd = [py3_path, "-m", "venv", str(venv_path)]
-            returncode, stdout, stderr = self._run_command(cmd)
+            returncode, stdout, stderr = self._run_command(cmd, capture_output=True)
             
             if returncode == 0:
-                self.console.print(f"Created with python3: {venv_path}", style="green")
                 activate_script = venv_path / "bin" / "activate"
                 self._update_global_tracking(env_name, str(activate_script))
-                self.console.print(f"Registered {env_name} in global tracking", style="blue")
-                self.activate_venv(env_name)
+                self.console.print(f"✅ Created venv: {env_name}")
                 return True
 
         # Try python
         py_path = self._find_executable("python")
         if py_path:
-            self.console.print("Found python, attempting to create venv...", style="blue")
-            if extra_args:
-                self.console.print(f"Extra args ignored for python: {' '.join(extra_args)}", style="yellow")
-            
             cmd = [py_path, "-m", "venv", str(venv_path)]
-            returncode, stdout, stderr = self._run_command(cmd)
+            returncode, stdout, stderr = self._run_command(cmd, capture_output=True)
             
             if returncode == 0:
-                self.console.print(f"Created with python: {venv_path}", style="green")
                 activate_script = venv_path / "bin" / "activate"
                 self._update_global_tracking(env_name, str(activate_script))
-                self.console.print(f"Registered {env_name} in global tracking", style="blue")
-                self.activate_venv(env_name)
+                self.console.print(f"✅ Created venv: {env_name}")
                 return True
 
-        self.console.print("No Python/uv found or all attempts failed. Run install_uv or install Python.", style="red")
+        self.console.print("Failed to create venv", style="red")
         return False
 
     def activate_venv(self, name: str, vscode: bool = False, auto: bool = False) -> bool:
@@ -455,16 +415,12 @@ class VenvManager:
             python_path = venv_path / "bin" / "python"
             if python_path.exists():
                 self._update_vscode_settings(str(python_path))
-            else:
-                self.console.print(f"Warning: Python executable not found at {python_path}", style="yellow")
         
         # Update shell auto-activation if requested
         if auto:
             self._update_shell_auto_activation(name)
         
         # Output activation information for shell function to parse
-        self.console.print(f"Activating: {venv_path.name}", style="green")
-        
         # This line is parsed by the shell function to get the activation script path
         self.console.print(f"source {activate_script}", style="blue")
         
@@ -587,7 +543,7 @@ class VenvManager:
             self.console.print(self.c_yellow("No valid virtual environments found"))
         return True
 
-    def delete_venv(self, env_name: str) -> bool:
+    def delete_venv(self, env_name: str, auto_yes: bool = False) -> bool:
         """Delete a virtual environment."""
         if not env_name:
             self.console.print(self.c_red("Usage: delete <name>"))
@@ -617,14 +573,13 @@ class VenvManager:
             self.console.print(self.c_red(f"Refusing to delete: '{venv_path}' is not a valid venv directory"))
             return False
 
-        if not self._confirm_action(f"Delete {env_name} at {venv_path}?"):
-            self.console.print(self.c_yellow("Cancelled"))
+        if not auto_yes and not self._confirm_action(f"Delete {env_name} at {venv_path}?"):
             return False
 
         try:
             shutil.rmtree(venv_path)
             self._remove_from_global_tracking(env_name)
-            self.console.print(self.c_green(f"Deleted: {env_name} ({venv_path})"))
+            self.console.print(self.c_green(f"Deleted: {env_name}"))
             return True
         except Exception as e:
             self.console.print(self.c_red(f"Failed to delete: {env_name} - {e}"))
@@ -697,8 +652,6 @@ class VenvManager:
 
     def install_packages(self, packages: List[str]) -> bool:
         """Install packages in active virtual environment."""
-        from rich.progress import Progress, SpinnerColumn, TextColumn
-        
         current_venv = self._get_current_venv()
         if not current_venv:
             self.console.print("No venv active", style="red")
@@ -708,31 +661,24 @@ class VenvManager:
             self.console.print("Usage: install <pkg>...", style="red")
             return False
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=self.console,
-        ) as progress:
-            task = progress.add_task(f"Installing: {' '.join(packages)}", total=None)
+        # Try uv first
+        if self._find_executable("uv"):
+            cmd = ["uv", "pip", "install"] + packages
+            returncode, stdout, stderr = self._run_command(cmd)
+            if returncode == 0:
+                self.console.print(f"Installed: {' '.join(packages)}")
+                return True
 
-            # Try uv first
-            if self._find_executable("uv"):
-                cmd = ["uv", "pip", "install"] + packages
-                returncode, stdout, stderr = self._run_command(cmd)
-                if returncode == 0:
-                    progress.update(task, description="[green]Installed with uv[/green]")
-                    return True
+        # Try pip
+        if self._find_executable("pip"):
+            cmd = ["pip", "install"] + packages
+            returncode, stdout, stderr = self._run_command(cmd)
+            if returncode == 0:
+                self.console.print(f"Installed: {' '.join(packages)}")
+                return True
 
-            # Try pip
-            if self._find_executable("pip"):
-                cmd = ["pip", "install"] + packages
-                returncode, stdout, stderr = self._run_command(cmd)
-                if returncode == 0:
-                    progress.update(task, description="[green]Installed with pip[/green]")
-                    return True
-
-            progress.update(task, description="[red]No uv or pip found in venv[/red]")
-            return False
+        self.console.print("No uv or pip found in venv", style="red")
+        return False
 
     def list_packages(self) -> bool:
         """List installed packages in active virtual environment."""
@@ -769,14 +715,12 @@ class VenvManager:
             self.console.print(self.c_red("Usage: uninstall <pkg>..."))
             return False
 
-        self.console.print(self.c_blue(f"Uninstalling: {' '.join(packages)}"))
-
         # Try uv first
         if self._find_executable("uv"):
             cmd = ["uv", "pip", "uninstall"] + packages
             returncode, stdout, stderr = self._run_command(cmd)
             if returncode == 0:
-                self.console.print(self.c_green("Uninstalled with uv"))
+                self.console.print(f"Uninstalled: {' '.join(packages)}")
                 return True
 
         # Try pip
@@ -784,7 +728,7 @@ class VenvManager:
             cmd = ["pip", "uninstall", "-y"] + packages
             returncode, stdout, stderr = self._run_command(cmd)
             if returncode == 0:
-                self.console.print(self.c_green("Uninstalled with pip"))
+                self.console.print(f"Uninstalled: {' '.join(packages)}")
                 return True
 
         self.console.print(self.c_red("No uv or pip found in venv"))
@@ -819,14 +763,12 @@ class VenvManager:
             self.console.print(self.c_red("Usage: update <pkg>..."))
             return False
 
-        self.console.print(self.c_blue(f"Updating: {' '.join(packages)}"))
-
         # Try uv first
         if self._find_executable("uv"):
             cmd = ["uv", "pip", "install", "-U"] + packages
             returncode, stdout, stderr = self._run_command(cmd)
             if returncode == 0:
-                self.console.print(self.c_green("Updated with uv"))
+                self.console.print(f"Updated: {' '.join(packages)}")
                 return True
 
         # Try pip
@@ -834,7 +776,7 @@ class VenvManager:
             cmd = ["pip", "install", "-U"] + packages
             returncode, stdout, stderr = self._run_command(cmd)
             if returncode == 0:
-                self.console.print(self.c_green("Updated with pip"))
+                self.console.print(f"Updated: {' '.join(packages)}")
                 return True
 
         self.console.print(self.c_red("No uv or pip found in venv"))
@@ -851,13 +793,12 @@ class VenvManager:
             self.console.print(self.c_red("Usage: run <cmd>..."))
             return False
 
-        self.console.print(self.c_blue(f"Running in venv: {' '.join(command)}"))
         returncode, stdout, stderr = self._run_command(command)
         
-        if stdout:
-            self.console.print(stdout)
-        if stderr:
-            self.console.print(stderr)
+        if returncode == 0:
+            self.console.print(f"Ran: {' '.join(command)}")
+        else:
+            self.console.print(f"Failed: {' '.join(command)}")
         
         return returncode == 0
 
@@ -976,36 +917,33 @@ class VenvManager:
         # Determine which shell integration script to use
         if 'zsh' in shell:
             integration_script = Path(__file__).parent / "shell_integration_zsh.sh"
-            shell_name = "zsh"
         else:
-            integration_script = Path(__file__).parent / "shell_integration_bash.sh" 
-            shell_name = "bash"
+            integration_script = Path(__file__).parent / "shell_integration_bash.sh"
         
         if not integration_script.exists():
-            print(f"Shell integration script not found: {integration_script}")
+            self.console.print(f"Shell integration script not found: {integration_script}")
             return False
         
         # Read the integration script content
         try:
             integration_content = integration_script.read_text()
         except Exception as e:
-            print(f"Failed to read integration script: {e}")
+            self.console.print(f"Failed to read integration script: {e}")
             return False
         
         # Check if shell config file exists, create if not
         if not config_file.exists():
-            print(f"Creating shell config file: {config_file}")
             try:
                 config_file.touch()
             except Exception as e:
-                print(f"Failed to create config file: {e}")
+                self.console.print(f"Failed to create config file: {e}")
                 return False
         
         # Read current config content
         try:
             current_content = config_file.read_text()
         except Exception as e:
-            print(f"Failed to read config file: {e}")
+            self.console.print(f"Failed to read config file: {e}")
             return False
         
         # Check if ve integration is already installed (either by marker or ve function)
@@ -1013,89 +951,18 @@ class VenvManager:
         has_ve_function = "ve()" in current_content or "function ve()" in current_content
         
         if ve_marker in current_content or has_ve_function:
-            if has_ve_function and ve_marker not in current_content:
-                print(f"ve() function already exists in {config_file} (not installed by ve)")
-                response = input("Remove existing ve() function and reinstall? [y/N] ").strip().lower()
-                if response not in ('y', 'yes'):
-                    print("Skipping installation to preserve existing ve() function.")
-                    return True
-            else:
-                print(f"ve shell integration already installed in {config_file}")
-                response = input("Reinstall shell integration? [y/N] ").strip().lower()
-                if response not in ('y', 'yes'):
-                    return True
-            
-            # Remove ALL existing ve integrations (both marked and unmarked)
-            lines = current_content.splitlines()
-            new_lines = []
-            in_ve_integration = False
-            in_ve_function = False
-            brace_count = 0
-            
-            i = 0
-            while i < len(lines):
-                line = lines[i]
-                
-                # Check for ve integration markers
-                if (ve_marker in line or 
-                    "# Virtual Environment Manager" in line or
-                    line.strip().startswith("# This enables proper activation of virtual environments")):
-                    in_ve_integration = True
-                    i += 1
-                    continue
-                
-                # Check for ve function definitions
-                if (("ve()" in line or "function ve()" in line) and 
-                    not line.strip().startswith("#")):
-                    in_ve_function = True
-                    brace_count = 0
-                    # Count braces on the same line
-                    brace_count += line.count("{") - line.count("}")
-                    i += 1
-                    continue
-                
-                # Handle ve function body
-                if in_ve_function:
-                    brace_count += line.count("{") - line.count("}")
-                    if brace_count <= 0:
-                        in_ve_function = False
-                    i += 1
-                    continue
-                
-                # Handle ve integration sections
-                if in_ve_integration:
-                    # Look for end of integration (empty line followed by non-comment/non-ve content)
-                    if (line.strip() == "" and 
-                        i + 1 < len(lines) and 
-                        lines[i + 1].strip() != "" and 
-                        not lines[i + 1].strip().startswith("#") and
-                        "ve()" not in lines[i + 1] and
-                        "function ve()" not in lines[i + 1] and
-                        "_ve_auto_activate" not in lines[i + 1] and
-                        "add-zsh-hook" not in lines[i + 1]):
-                        in_ve_integration = False
-                        # Don't skip this line, it might be important spacing
-                        new_lines.append(line)
-                    i += 1
-                    continue
-                
-                # Keep lines that are not part of ve integration
-                new_lines.append(line)
-                i += 1
-            
-            current_content = "\n".join(new_lines)
+            self.console.print("ve shell integration already installed")
+            return True
         
         # Add the integration
         new_content = current_content.rstrip() + "\n\n" + ve_marker + "\n" + integration_content + "\n"
         
         try:
             config_file.write_text(new_content)
-            print(f"✅ ve shell integration installed to {config_file}")
-            print(f"🔄 Run 'source {config_file}' or restart your {shell_name} shell to activate")
-            print("💡 After sourcing, you can use 've activate <env>' to properly activate environments")
+            self.console.print("ve shell integration installed")
             return True
-        except Exception as e:
-            print(f"Failed to write to config file: {e}")
+        except Exception:
+            self.console.print("Failed to install shell integration")
             return False
 
     def help_text(self) -> str:
