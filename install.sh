@@ -15,7 +15,7 @@ if ! is_uv_installed; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
-export PATH="$HOME/.uv/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 
 echo "uv is installed"
 
