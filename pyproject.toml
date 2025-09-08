@@ -1,43 +1,46 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyve"
 version = "1.0.1"
 description = "Comprehensive virtual environment management tool"
-authors = [{name = "anhvth5"}]
 readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.7"
+authors = [{ name = "anhvth5" }]
 keywords = ["virtual-environment", "venv", "python", "environment-management"]
-dependencies = ["json5", "rich"]
+dependencies = [
+  "json5",
+  "rich",
+]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: System :: Systems Administration",
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Systems Administration",
 ]
 
 [project.urls]
-Homepage = "https://github.com/anhvth/speedy_utils"
-Repository = "https://github.com/anhvth/speedy_utils"
+Homepage = "https://github.com/anhvth/vex"
+Repository = "https://github.com/anhvth/vex"
 
 [project.scripts]
-# Main ve command - unified interface for all functionality
 ve = "pyve.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["pyve"]
+include = ["pyve*"]
 
 [tool.setuptools.package-data]
-pyve = ["*.txt", "*.md"]
+pyve = ["*.sh", "*.fish"]

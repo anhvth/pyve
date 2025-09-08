@@ -17,13 +17,15 @@ class VenvManager:
     
     def __init__(self):
         self.home = Path.home()
-        self.venvs_dir = self.home / ".venvs"
-        self.global_env_file = self.home / ".venv_all_env"
-        self.atv_history_file = self.home / ".config" / "atv_history"
-        self.assoc_file = self.home / ".venv_pdirs"
-        self.last_venv_file = self.home / ".last_venv"
+        self.vex_root = self.home / ".vex"
+        self.venvs_dir = self.vex_root / "venvs"
+        self.global_env_file = self.vex_root / "venv_all_env"
+        self.atv_history_file = self.vex_root / "atv_history"
+        self.assoc_file = self.vex_root / "venv_pdirs"
+        self.last_venv_file = self.vex_root / "last_venv"
         
         # Ensure directories exist
+        self.vex_root.mkdir(exist_ok=True)
         self.venvs_dir.mkdir(exist_ok=True)
         self.atv_history_file.parent.mkdir(parents=True, exist_ok=True)
         
@@ -192,13 +194,39 @@ class VenvManager:
 
     def _detect_shell_and_config(self) -> Tuple[str, Path]:
         """Detect shell type and return appropriate config file path."""
+        # Check for fish-specific environment variables first (most reliable)
+        if os.environ.get('FISH_VERSION'):
+            config_file = Path.home() / '.config' / 'fish' / 'config.fish'
+            return 'fish', config_file
+        
+        # Use fish_pid to detect if we're in fish shell
+        fish_pid = os.environ.get('fish_pid')
+        if fish_pid:
+            try:
+                import subprocess
+                result = subprocess.run(['ps', '-p', fish_pid, '-o', 'comm='], 
+                                      capture_output=True, text=True, check=True)
+                if 'fish' in result.stdout.strip():
+                    config_file = Path.home() / '.config' / 'fish' / 'config.fish'
+                    return 'fish', config_file
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass
+        
+        # Check SHELL environment variable
         shell = os.environ.get('SHELL', '')
-        if 'zsh' in shell:
+        if 'fish' in shell:
+            config_file = Path.home() / '.config' / 'fish' / 'config.fish'
+            return 'fish', config_file
+        elif 'zsh' in shell:
             config_file = Path.home() / '.zshrc'
+            return 'zsh', config_file
+        elif 'bash' in shell:
+            config_file = Path.home() / '.bashrc'
+            return 'bash', config_file
         else:
             # Default to bash
             config_file = Path.home() / '.bashrc'
-        return shell, config_file
+            return 'bash', config_file
 
     def _get_auto_activate_command(self, env_name: str) -> str:
         """Generate the auto-activation command for the shell config."""
@@ -314,7 +342,7 @@ class VenvManager:
 
         venv_path = self.venvs_dir / env_name
 
-        # Check if venv already exists in ~/.venvs
+        # Check if venv already exists in ~/.vex/venvs
         if venv_path.exists():
             if not auto_yes and not self._confirm_action(f"Overwrite {venv_path}?"):
                 return False
@@ -438,14 +466,14 @@ class VenvManager:
                 activate_script = Path(tracked_activate)
                 venv_path = activate_script.parent.parent
             else:
-                # Try ~/.venvs/<name>
+                # Try ~/.vex/venvs/<name>
                 fallback_path = self.venvs_dir / name
                 fallback_activate = fallback_path / "bin" / "activate"
                 if fallback_path.is_dir() and fallback_activate.exists():
                     venv_path = fallback_path
                     activate_script = fallback_activate
                 else:
-                    self.console.print(f"Environment '{name}' not found in global tracking or ~/.venvs/{name}", style="red")
+                    self.console.print(f"Environment '{name}' not found in global tracking or ~/.vex/venvs/{name}", style="red")
                     self.list_venvs()
                     return False
 
@@ -964,23 +992,36 @@ class VenvManager:
         # Determine which shell integration script to use
         if 'zsh' in shell:
             integration_script = Path(__file__).parent / "shell_integration_zsh.sh"
+            target_filename = "shell_integration_zsh.sh"
+        elif 'fish' in shell:
+            integration_script = Path(__file__).parent / "shell_integration_fish.fish"
+            target_filename = "shell_integration_fish.fish"
         else:
             integration_script = Path(__file__).parent / "shell_integration_bash.sh"
+            target_filename = "shell_integration_bash.sh"
         
         if not integration_script.exists():
             self.console.print(f"Shell integration script not found: {integration_script}")
             return False
         
-        # Read the integration script content
+        # Create the pyve config directory
+        pyve_config_dir = Path.home() / '.config' / 'pyve'
+        pyve_config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Copy the shell integration file to the config directory
+        target_script = pyve_config_dir / target_filename
         try:
-            integration_content = integration_script.read_text()
+            import shutil
+            shutil.copy2(integration_script, target_script)
+            self.console.print(f"Copied shell integration to: {target_script}")
         except Exception as e:
-            self.console.print(f"Failed to read integration script: {e}")
+            self.console.print(f"Failed to copy integration script: {e}")
             return False
         
         # Check if shell config file exists, create if not
         if not config_file.exists():
             try:
+                config_file.parent.mkdir(parents=True, exist_ok=True)
                 config_file.touch()
             except Exception as e:
                 self.console.print(f"Failed to create config file: {e}")
@@ -993,16 +1034,24 @@ class VenvManager:
             self.console.print(f"Failed to read config file: {e}")
             return False
         
-        # Check if ve integration is already installed (either by marker or ve function)
+        # Create the source line
         ve_marker = "# Virtual Environment Manager (ve) Integration"
-        has_ve_function = "ve()" in current_content or "function ve()" in current_content
+        source_line = f"source {target_script}"
         
-        if ve_marker in current_content or has_ve_function:
+        # Check if ve integration is already installed
+        has_ve_function = "ve()" in current_content or "function ve()" in current_content or "function ve" in current_content
+        has_source_line = source_line in current_content
+        has_marker = ve_marker in current_content
+        
+        if has_source_line or has_marker:
             self.console.print("ve shell integration already installed")
             return True
+        elif has_ve_function:
+            self.console.print("ve() function already exists (not installed by pyve)")
+            return True
         
-        # Add the integration
-        new_content = current_content.rstrip() + "\n\n" + ve_marker + "\n" + integration_content + "\n"
+        # Add the source line to the config file
+        new_content = current_content.rstrip() + "\n\n" + ve_marker + "\n" + source_line + "\n"
         
         try:
             config_file.write_text(new_content)

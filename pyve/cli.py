@@ -56,7 +56,7 @@ def interactive_env_selection():
             parts = line.strip().split(" ", 1)
             if len(parts) == 2:
                 env_name, activate_path = parts
-                if manager._find_executable("python") and str(manager._find_executable("python")).startswith(str(manager.home / ".venvs" / env_name)):
+                if manager._find_executable("python") and str(manager._find_executable("python")).startswith(str(manager.venvs_dir / env_name)):
                     envs.append(f"{env_name} (active)")
                 else:
                     envs.append(env_name)
